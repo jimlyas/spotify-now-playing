@@ -37,15 +37,22 @@ def refreshToken():
     response = requests.post(SPOTIFY_URL_REFRESH_TOKEN, data=data, headers=headers)
     return response.json()["access_token"]
 
-def recentlyPlayed():
-    token = refreshToken()
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(SPOTIFY_URL_RECENTLY_PLAY, headers=headers)
+def refreshToken():
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": SPOTIFY_REFRESH_TOKEN,
+    }
 
-    if response.status_code == 204:
-        return {}
+    headers = {"Authorization": "Basic {}".format(getAuth())}
 
-    return response.json()
+    response = requests.post(SPOTIFY_URL_REFRESH_TOKEN, data=data, headers=headers)
+    body = response.json()
+
+    if "access_token" not in body:
+        print("Spotify token error:", response.status_code, body)
+        raise RuntimeError("Spotify token request failed")
+
+    return body["access_token"]
 
 def nowPlaying():
 
