@@ -124,7 +124,7 @@ def catch_all(path):
     svg = makeSVG(data)
 
     resp = Response(svg, mimetype="image/svg+xml")
-    resp.headers["Cache-Control"] = "s-maxage=1"
+    resp.headers["Cache-Control"] = "s-maxage=1, max-age=0, no-cache"
 
     return resp
 
