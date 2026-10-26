@@ -8,6 +8,7 @@ import requests
 import json
 import os
 import random
+import re
 
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_SECRET_ID = os.getenv("SPOTIFY_SECRET_ID")
@@ -17,6 +18,11 @@ SPOTIFY_REFRESH_TOKEN = os.getenv("SPOTIFY_REFRESH_TOKEN")
 SPOTIFY_URL_REFRESH_TOKEN = "https://accounts.spotify.com/api/token"
 SPOTIFY_URL_NOW_PLAYING = "https://api.spotify.com/v1/me/player/currently-playing"
 SPOTIFY_URL_RECENTLY_PLAY = "https://api.spotify.com/v1/me/player/recently-played?limit=10"
+
+# Card frame: keep these identical to the AniList card so the two match.
+CARD_PAD = 14
+CARD_RADIUS = 12
+CARD_BG = "#0d1117"
 
 
 app = Flask(__name__)
@@ -116,12 +122,50 @@ def makeSVG(data):
     return render_template("spotify.html.j2", **dataDict)
 
 
+def frameSVG(svg, pad=CARD_PAD):
+    """Wrap the rendered template in the same dark, rounded, bordered card as the
+    AniList card. The original SVG is nested untouched (no scaling), so its
+    layout and animations are unchanged. If its size can't be read, it is
+    returned as-is."""
+    start = re.search(r"<svg\b([^>]*)>", svg)
+    if not start:
+        return svg
+    attrs = start.group(1)
+
+    def number(name):
+        found = re.search(rf'\s{name}="\s*([\d.]+)\s*(?:px)?\s*"', attrs)
+        return float(found.group(1)) if found else None
+
+    width, height = number("width"), number("height")
+    if not (width and height):
+        box = re.search(r'viewBox="\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"', attrs)
+        if not box:
+            return svg
+        width, height = float(box.group(1)), float(box.group(2))
+        attrs += f' width="{width:g}" height="{height:g}"'
+
+    # drop any x/y the template set, we position the nested copy ourselves
+    attrs = re.sub(r'\s(?:x|y)="[^"]*"', "", attrs)
+    inner = svg[start.end():]  # everything after the original opening tag, including </svg>
+
+    total_w = width + 2 * pad
+    total_h = height + 2 * pad
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
+        f'width="{total_w:g}" height="{total_h:g}" viewBox="0 0 {total_w:g} {total_h:g}">'
+        f'<rect x="0.5" y="0.5" width="{total_w - 1:g}" height="{total_h - 1:g}" rx="{CARD_RADIUS}" '
+        f'fill="{CARD_BG}" stroke="#ffffff" stroke-opacity="0.14"/>'
+        f'<svg x="{pad}" y="{pad}"{attrs}>{inner}'
+        f"</svg>"
+    )
+
+
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def catch_all(path):
 
     data = nowPlaying()
-    svg = makeSVG(data)
+    svg = frameSVG(makeSVG(data))
 
     resp = Response(svg, mimetype="image/svg+xml")
     resp.headers["Cache-Control"] = "s-maxage=1, max-age=0, no-cache"
