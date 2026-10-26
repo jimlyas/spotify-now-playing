@@ -35,17 +35,6 @@ def refreshToken():
     headers = {"Authorization": "Basic {}".format(getAuth())}
 
     response = requests.post(SPOTIFY_URL_REFRESH_TOKEN, data=data, headers=headers)
-    return response.json()["access_token"]
-
-def refreshToken():
-    data = {
-        "grant_type": "refresh_token",
-        "refresh_token": SPOTIFY_REFRESH_TOKEN,
-    }
-
-    headers = {"Authorization": "Basic {}".format(getAuth())}
-
-    response = requests.post(SPOTIFY_URL_REFRESH_TOKEN, data=data, headers=headers)
     body = response.json()
 
     if "access_token" not in body:
@@ -53,6 +42,18 @@ def refreshToken():
         raise RuntimeError("Spotify token request failed")
 
     return body["access_token"]
+
+
+def recentlyPlayed():
+    token = refreshToken()
+    headers = {"Authorization": f"Bearer {token}"}
+    response = requests.get(SPOTIFY_URL_RECENTLY_PLAY, headers=headers)
+
+    if response.status_code == 204:
+        return {}
+
+    return response.json()
+
 
 def nowPlaying():
 
@@ -67,6 +68,7 @@ def nowPlaying():
 
     return response.json()
 
+
 def barGen(barCount):
     barCSS = ""
     left = 1
@@ -79,9 +81,11 @@ def barGen(barCount):
 
     return barCSS
 
+
 def loadImageB64(url):
     resposne = requests.get(url)
     return b64encode(resposne.content).decode("ascii")
+
 
 def makeSVG(data):
     barCount = 85
@@ -111,33 +115,6 @@ def makeSVG(data):
 
     return render_template("spotify.html.j2", **dataDict)
 
-def refreshToken():
-    data = {
-        "grant_type": "refresh_token",
-        "refresh_token": SPOTIFY_REFRESH_TOKEN,
-    }
-
-    headers = {"Authorization": "Basic {}".format(getAuth())}
-
-    response = requests.post(SPOTIFY_URL_REFRESH_TOKEN, data=data, headers=headers)
-    body = response.json()
-
-    if "access_token" not in body:
-        print("Spotify token error:", response.status_code, body)
-        raise RuntimeError("Spotify token request failed")
-
-    return body["access_token"]
-
-
-def recentlyPlayed():
-    token = refreshToken()
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(SPOTIFY_URL_RECENTLY_PLAY, headers=headers)
-
-    if response.status_code == 204:
-        return {}
-
-    return response.json()
 
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
@@ -150,6 +127,7 @@ def catch_all(path):
     resp.headers["Cache-Control"] = "s-maxage=1"
 
     return resp
+
 
 if __name__ == "__main__":
     app.run(debug=True)
