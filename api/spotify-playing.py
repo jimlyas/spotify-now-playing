@@ -119,14 +119,14 @@ def makeSVG(data):
         "img": img,
     }
 
-    return render_template("spotify.html.j2", **dataDict)
+    return render_template("spotify.html.j2", **dataDict), img
 
 
-def frameSVG(svg, pad=CARD_PAD):
+def frameSVG(svg, img=None, pad=CARD_PAD):
     """Wrap the rendered template in the same dark, rounded, bordered card as the
-    AniList card. The original SVG is nested untouched (no scaling), so its
-    layout and animations are unchanged. If its size can't be read, it is
-    returned as-is."""
+    AniList card, with the album art blurred and dimmed behind it. The original
+    SVG is nested untouched (no scaling), so its layout and animations are
+    unchanged. If its size can't be read, it is returned as-is."""
     start = re.search(r"<svg\b([^>]*)>", svg)
     if not start:
         return svg
@@ -150,11 +150,31 @@ def frameSVG(svg, pad=CARD_PAD):
 
     total_w = width + 2 * pad
     total_h = height + 2 * pad
+    artwork = ""
+    if img:
+        artwork = (
+            f'<image x="-40" y="-60" width="{total_w + 80:g}" height="{total_h + 120:g}" '
+            f'preserveAspectRatio="xMidYMid slice" filter="url(#sp-blur)" '
+            f'xlink:href="data:image/jpeg;base64,{img}"/>'
+            f'<rect width="{total_w:g}" height="{total_h:g}" fill="url(#sp-shade)"/>'
+        )
+
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
         f'width="{total_w:g}" height="{total_h:g}" viewBox="0 0 {total_w:g} {total_h:g}">'
+        f'<defs>'
+        f'<clipPath id="sp-card"><rect width="{total_w:g}" height="{total_h:g}" rx="{CARD_RADIUS}"/></clipPath>'
+        f'<filter id="sp-blur" x="-10%" y="-10%" width="120%" height="120%">'
+        f'<feGaussianBlur stdDeviation="18"/></filter>'
+        f'<linearGradient id="sp-shade" x1="0" y1="0" x2="1" y2="0">'
+        f'<stop offset="0" stop-color="{CARD_BG}" stop-opacity="0.72"/>'
+        f'<stop offset="1" stop-color="{CARD_BG}" stop-opacity="0.92"/>'
+        f'</linearGradient></defs>'
+        f'<g clip-path="url(#sp-card)">'
+        f'<rect width="{total_w:g}" height="{total_h:g}" fill="{CARD_BG}"/>{artwork}'
+        f'</g>'
         f'<rect x="0.5" y="0.5" width="{total_w - 1:g}" height="{total_h - 1:g}" rx="{CARD_RADIUS}" '
-        f'fill="{CARD_BG}" stroke="#ffffff" stroke-opacity="0.14"/>'
+        f'fill="none" stroke="#ffffff" stroke-opacity="0.14"/>'
         f'<svg x="{pad}" y="{pad}"{attrs}>{inner}'
         f"</svg>"
     )
@@ -165,7 +185,8 @@ def frameSVG(svg, pad=CARD_PAD):
 def catch_all(path):
 
     data = nowPlaying()
-    svg = frameSVG(makeSVG(data))
+    svg, img = makeSVG(data)
+    svg = frameSVG(svg, img)
 
     resp = Response(svg, mimetype="image/svg+xml")
     resp.headers["Cache-Control"] = "s-maxage=1, max-age=0, no-cache"
